@@ -21,12 +21,10 @@ export default function App() {
   const [gpxData, setGpxData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Filters
   const [filterType, setFilterType] = useState('All');
   const [filterYear, setFilterYear] = useState('All');
   const [selectedTrack, setSelectedTrack] = useState(null);
 
-  // Fetch all hikes from Cloudflare D1 when the app loads
   useEffect(() => {
     fetch('/api')
       .then(res => res.json())
@@ -76,10 +74,8 @@ export default function App() {
       coordinates: gpxData || []
     };
 
-    // Optimistically update frontend interface instantly
     setHikes([newHike, ...hikes]);
 
-    // Send payload permanently up to Cloudflare D1 database
     try {
       await fetch('/api', {
         method: 'POST',
@@ -90,7 +86,6 @@ export default function App() {
       alert("Failed to securely sync entry to cloud.");
     }
 
-    // Reset Entry Fields
     setDate('');
     setNotes('');
     setGpxData(null);
@@ -160,7 +155,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Type</label>
-                <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
+                <select value={filterType} onChange={setFilterType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
                   <option value="All">All Types</option>
                   <option value="Hiking">Hiking</option>
                   <option value="Beach Cleaning">Beach Cleaning</option>
@@ -168,7 +163,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Year</label>
-                <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
+                <select value={filterYear} onChange={setFilterYear(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
                   {years.map(yr => <option key={yr} value={yr}>{yr}</option>)}
                 </select>
               </div>
@@ -213,3 +208,34 @@ export default function App() {
                   <div 
                     key={hike.id}
                     onClick={() => hike.coordinates.length > 0 && setSelectedTrack(hike)}
+className={p-4 bg-slate-950 border rounded-xl flex items-start justify-between transition-all cursor-pointer ${selectedTrack?.id === hike.id ? 'border-emerald-500 bg-slate-900' : 'border-slate-800 hover:border-slate-700'}}
+>
+
+
+<span className={px-2 py-0.5 rounded text-xs font-medium font-mono ${hike.type === 'Hiking' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}}>
+{hike.type}
+
+
+ {hike.date}
+
+
+
+
+{hike.notes || No location notes added}
+
+{hike.coordinates.length > 0 && (
+
+🗺️ GPX Path Traced
+
+)}
+
+
+))}
+
+)}
+
+
+
+
+);
+}
