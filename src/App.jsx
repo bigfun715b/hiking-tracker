@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
-import { Calendar, Filter, MapPin, Trash2, Plus, Upload, Layers } from 'lucide-react';
+import { Calendar, Filter, MapPin, Plus, Upload, Layers } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
-// Small helper component to automatically refocus the map when a track loads
 function MapRecenter({ positions }) {
   const map = useMap();
   useEffect(() => {
@@ -20,13 +19,27 @@ export default function App() {
   const [type, setType] = useState('Hiking');
   const [notes, setNotes] = useState('');
   const [gpxData, setGpxData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Filters
   const [filterType, setFilterType] = useState('All');
   const [filterYear, setFilterYear] = useState('All');
   const [selectedTrack, setSelectedTrack] = useState(null);
 
-  // Parse simulated or uploaded GPX file into simple map coordinates
+  // Fetch all hikes from Cloudflare D1 when the app loads
+  useEffect(() => {
+    fetch('/api')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setHikes(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error("Database loading error:", err);
+        setIsLoading(false);
+      });
+  }, []);
+
   const handleGpxUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -34,27 +47,24 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target.result;
-      // Simple regex parser for GPX coordinates (Latitude/Longitude)
       const latMatches = [...text.matchAll(/lat="([^"]+)"/g)];
       const lonMatches = [...text.matchAll(/lon="([^"]+)"/g)];
       
       const coordinates = latMatches.map((match, index) => [
         parseFloat(match[1]),
-        parseFloat(lonMatches[index]?.[1] || 0)
+        parseFloat(lonMatches[index] ? lonMatches[index][1] : 0)
       ]);
 
       if (coordinates.length > 0) {
         setGpxData(coordinates);
       } else {
-        alert("Could not extract coordinates from GPX file. Setting mock coordinates for preview.");
-        // Fallback demo track if file format parsing fails locally
-        setGpxData([[22.352, 114.180], [22.355, 114.185], [22.358, 114.190]]);
+        alert("Could not read map markers from this GPX file.");
       }
     };
     reader.readAsText(file);
   };
 
-  const handleSaveHike = (e) => {
+  const handleSaveHike = async (e) => {
     e.preventDefault();
     if (!date) return alert("Please select a date");
 
@@ -66,22 +76,28 @@ export default function App() {
       coordinates: gpxData || []
     };
 
+    // Optimistically update frontend interface instantly
     setHikes([newHike, ...hikes]);
-    // Reset Form
+
+    // Send payload permanently up to Cloudflare D1 database
+    try {
+      await fetch('/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newHike)
+      });
+    } catch (err) {
+      alert("Failed to securely sync entry to cloud.");
+    }
+
+    // Reset Entry Fields
     setDate('');
     setNotes('');
     setGpxData(null);
   };
 
-  const handleDelete = (id) => {
-    setHikes(hikes.filter(hike => hike.id !== id));
-    if (selectedTrack?.id === id) setSelectedTrack(null);
-  };
-
-  // Get unique years for the filter dropdown
   const years = ['All', ...new Set(hikes.map(h => new Date(h.date).getFullYear().toString()))];
 
-  // Apply filters
   const filteredHikes = hikes.filter(hike => {
     const matchType = filterType === 'All' || hike.type === filterType;
     const matchYear = filterYear === 'All' || new Date(hike.date).getFullYear().toString() === filterYear;
@@ -90,18 +106,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
-      {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-950/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <Layers className="w-6 h-6 text-emerald-400" />
-          <h1 className="text-xl font-bold tracking-tight text-white">TrailLog <span className="text-xs text-emerald-400 font-mono">D1 Edition</span></h1>
+          <h1 className="text-xl font-bold tracking-tight text-white">TrailLog <span className="text-xs text-emerald-400 font-mono">D1 Database Connected</span></h1>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Hand Side: Log Entry Form & Filters */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Add Hike Box */}
           <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 shadow-xl">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Plus className="w-5 h-5 text-emerald-400" /> Log a New Activity
@@ -124,7 +137,7 @@ export default function App() {
                 <label className="block text-xs uppercase tracking-wider text-slate-400 font-medium mb-1">GPX Route File</label>
                 <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-lg py-4 cursor-pointer transition-colors bg-slate-900/50">
                   <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                  <span className="text-xs text-slate-400">{gpxData ? "File loaded successfully!" : "Choose .gpx file"}</span>
+                  <span className="text-xs text-slate-400">{gpxData ? "🗺️ GPX Loaded Successfully!" : "Choose .gpx file"}</span>
                   <input type="file" accept=".gpx" onChange={handleGpxUpload} className="hidden" />
                 </label>
               </div>
@@ -140,7 +153,6 @@ export default function App() {
             </form>
           </div>
 
-          {/* Interactive Filters Panel */}
           <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 shadow-xl space-y-4">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <Filter className="w-4 h-4 text-emerald-400" /> Filter Logs
@@ -164,9 +176,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Hand Side: Map Visualization & History Stream */}
         <div className="lg:col-span-8 flex flex-col gap-6">
-          {/* Map Viewer Box */}
           <div className="bg-slate-950 border border-slate-800 rounded-xl h-96 overflow-hidden relative shadow-xl">
             <MapContainer center={[22.3193, 114.1694]} zoom={11} scrollWheelZoom={true} className="h-full w-full">
               <TileLayer
@@ -181,18 +191,19 @@ export default function App() {
               )}
             </MapContainer>
             {!selectedTrack && (
-              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-[400] pointer-events-none">
+              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none">
                 <p className="text-sm text-slate-400 bg-slate-900/90 px-4 py-2 border border-slate-800 rounded-full">
-                  💡 Tap an activity below to view its GPX track on the map
+                  💡 Tap an entry below to draw its GPX track map trace line
                 </p>
               </div>
             )}
           </div>
 
-          {/* Activity List Container */}
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-white px-1">Your Records ({filteredHikes.length})</h2>
-            {filteredHikes.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12 text-slate-500 text-sm">Contacting database...</div>
+            ) : filteredHikes.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
                 No entries match your selections.
               </div>
