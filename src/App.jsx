@@ -39,8 +39,8 @@ export default function App() {
   }, []);
 
   const handleGpxUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files;
+    if (!file || file.length === 0) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -59,7 +59,7 @@ export default function App() {
         alert("Could not read map markers from this GPX file.");
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file[0]);
   };
 
   const handleSaveHike = async (e) => {
@@ -91,11 +91,16 @@ export default function App() {
     setGpxData(null);
   };
 
-  const years = ['All', ...new Set(hikes.map(h => new Date(h.date).getFullYear().toString()))];
+  const years = ['All', ...new Set(hikes.map(h => {
+    const d = new Date(h.date);
+    return isNaN(d.getTime()) ? '2026' : d.getFullYear().toString();
+  }))];
 
   const filteredHikes = hikes.filter(hike => {
     const matchType = filterType === 'All' || hike.type === filterType;
-    const matchYear = filterYear === 'All' || new Date(hike.date).getFullYear().toString() === filterYear;
+    const hikeDate = new Date(hike.date);
+    const hikeYear = isNaN(hikeDate.getTime()) ? '2026' : hikeDate.getFullYear().toString();
+    const matchYear = filterYear === 'All' || hikeYear === filterYear;
     return matchType && matchYear;
   });
 
@@ -104,7 +109,9 @@ export default function App() {
       <header className="border-b border-slate-800 bg-slate-950/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <Layers className="w-6 h-6 text-emerald-400" />
-          <h1 className="text-xl font-bold tracking-tight text-white">TrailLog <span className="text-xs text-emerald-400 font-mono">D1 Database Connected</span></h1>
+          <h1 className="text-xl font-bold tracking-tight text-white">
+            TrailLog <span className="text-xs text-emerald-400 font-mono">D1 Connected</span>
+          </h1>
         </div>
       </header>
 
@@ -155,7 +162,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Type</label>
-                <select value={filterType} onChange={setFilterType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
+                <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
                   <option value="All">All Types</option>
                   <option value="Hiking">Hiking</option>
                   <option value="Beach Cleaning">Beach Cleaning</option>
@@ -163,7 +170,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Year</label>
-                <select value={filterYear} onChange={setFilterYear(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
+                <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white">
                   {years.map(yr => <option key={yr} value={yr}>{yr}</option>)}
                 </select>
               </div>
@@ -208,34 +215,3 @@ export default function App() {
                   <div 
                     key={hike.id}
                     onClick={() => hike.coordinates.length > 0 && setSelectedTrack(hike)}
-className={p-4 bg-slate-950 border rounded-xl flex items-start justify-between transition-all cursor-pointer ${selectedTrack?.id === hike.id ? 'border-emerald-500 bg-slate-900' : 'border-slate-800 hover:border-slate-700'}}
->
-
-
-<span className={px-2 py-0.5 rounded text-xs font-medium font-mono ${hike.type === 'Hiking' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}}>
-{hike.type}
-
-
- {hike.date}
-
-
-
-
-{hike.notes || No location notes added}
-
-{hike.coordinates.length > 0 && (
-
-🗺️ GPX Path Traced
-
-)}
-
-
-))}
-
-)}
-
-
-
-
-);
-}
